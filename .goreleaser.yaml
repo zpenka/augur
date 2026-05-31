@@ -48,7 +48,7 @@ homebrew_casks:
   - name: augur
     repository:
       owner: zpenka
-      name: homebrew-augur
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/zpenka/augur
     description: "git blame for AI — traces code back to the Claude session that wrote it"
