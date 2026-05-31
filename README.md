@@ -4,7 +4,17 @@
 
 Given a file (or a specific line), augur walks your Claude Code session history to find the prompt that produced the code, which session it came from, and how many rounds of back-and-forth it took.
 
+## Install
+
+```bash
+go install github.com/zpenka/augur/cmd/augur@latest
+```
+
 ## Usage
+
+```
+augur [--json] [--dir <projects-dir>] <file>[:<line>]
+```
 
 ```bash
 # Trace a specific line
@@ -13,11 +23,19 @@ augur src/auth.go:42
 # Trace a whole file (shows all AI-attributed regions)
 augur src/auth.go
 
-# JSON output (for piping)
+# JSON output (for piping / tooling)
 augur --json src/auth.go:42
+
+# Use a custom Claude projects directory
+augur --dir /path/to/projects src/auth.go
+
+# Print version
+augur --version
 ```
 
-### Example output
+## Output
+
+### Single-line lookup
 
 ```
 src/auth.go:42
@@ -32,7 +50,7 @@ src/auth.go:42
   turn     2 of 5
 ```
 
-If no session matches (code predates AI usage or session was deleted):
+If no session matches (code predates AI usage or the session was deleted):
 
 ```
 src/auth.go:42
@@ -44,25 +62,30 @@ src/auth.go:42
   no session match
 ```
 
+### Whole-file lookup
+
+```
+src/auth.go — 3 region(s), 2 AI-attributed
+
+  lines 1-18      abc1234f  3 days ago    "add error handling to the auth flow"
+  lines 19-40     def5678a  2 weeks ago   "refactor session middleware"
+  lines 41-55     abc1234f  3 days ago    no match (Jane Doe)
+```
+
 ## How it works
 
 1. Runs `git blame` on the target file/line to get the commit hash and timestamp.
 2. Scans `~/.claude/projects/` for sessions whose working directory is within the same git repo.
-3. Filters to sessions that started within 7 days before the commit.
+3. Filters to sessions that started within 7 days before the commit (with a 1-hour clock-skew buffer).
 4. Parses each candidate session's JSONL transcript, looking for `Edit` or `Write` tool calls on the target file.
 5. Returns the user prompt that preceded the matching edit, plus session metadata.
-
-## Install
-
-```bash
-go install github.com/zpenka/augur/cmd/augur@latest
-```
 
 ## Configuration
 
 | Flag | Env var | Default |
 |------|---------|---------|
 | `--dir` | `AUGUR_PROJECTS_DIR` | `~/.claude/projects` |
+| `--json` | — | text output |
 
 ## Companion tool
 
