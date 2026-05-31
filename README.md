@@ -7,6 +7,12 @@ Given a file (or a specific line), augur walks your Claude Code session history 
 ## Install
 
 ```bash
+brew install zpenka/augur/augur
+```
+
+Or via Go:
+
+```bash
 go install github.com/zpenka/augur/cmd/augur@latest
 ```
 
