@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func printLineResultText(r *LineResult) {
+func printLineResultText(r *LineResult, verbose bool) {
 	rel := relPath(r.File)
 	fmt.Printf("%s:%d\n\n", rel, r.Line)
 
@@ -29,7 +29,8 @@ func printLineResultText(r *LineResult) {
 		if r.Match.Session.Branch != "" {
 			fmt.Printf("  branch   %s\n", r.Match.Session.Branch)
 		}
-		fmt.Printf("  prompt   %q\n", truncate(r.Match.Prompt, 100))
+		prompt := promptDisplay(r.Match.Prompt, verbose, 100)
+		fmt.Printf("  prompt   %q\n", prompt)
 		fmt.Printf("  turn     %d of %d\n", r.Match.TurnIndex, r.Match.TotalTurns)
 	} else {
 		fmt.Printf("  no session match\n")
@@ -38,7 +39,7 @@ func printLineResultText(r *LineResult) {
 	fmt.Println()
 }
 
-func printFileResultText(r *FileResult) {
+func printFileResultText(r *FileResult, verbose bool) {
 	rel := relPath(r.File)
 	matched := 0
 	for _, reg := range r.Regions {
@@ -61,7 +62,7 @@ func printFileResultText(r *FileResult) {
 		}
 
 		if reg.Match != nil {
-			prompt := truncate(reg.Match.Prompt, 60)
+			prompt := promptDisplay(reg.Match.Prompt, verbose, 60)
 			fmt.Printf("  lines %-8s  %s  %-12s  %q\n", lineRange, commitShort, age, prompt)
 		} else {
 			if reg.Blame != nil && reg.Blame.Author != "" {
@@ -110,6 +111,23 @@ func humanTime(t time.Time) string {
 	default:
 		return fmt.Sprintf("%d months ago", int(d.Hours()/(30*24)))
 	}
+}
+
+func promptDisplay(s string, verbose bool, max int) string {
+	if verbose {
+		return normalizeInline(s)
+	}
+	return truncate(s, max)
+}
+
+func normalizeInline(s string) string {
+	r := []rune(s)
+	for i, c := range r {
+		if c == '\n' || c == '\r' || c == '\t' {
+			r[i] = ' '
+		}
+	}
+	return strings.TrimSpace(string(r))
 }
 
 func truncate(s string, max int) string {

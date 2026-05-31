@@ -37,15 +37,17 @@ type FileResult struct {
 
 func Run() int {
 	var jsonFlag bool
+	var verboseFlag bool
 	var claudeDir string
 	var versionFlag bool
 
 	flag.BoolVar(&jsonFlag, "json", false, "output as JSON")
+	flag.BoolVar(&verboseFlag, "verbose", false, "show full prompt text without truncation")
 	flag.StringVar(&claudeDir, "dir", "", "claude projects directory")
 	flag.BoolVar(&versionFlag, "version", false, "print version and exit")
 	flag.BoolVar(&versionFlag, "v", false, "print version and exit")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: augur [--json] [--dir <projects-dir>] <file>[:<line>]")
+		fmt.Fprintln(os.Stderr, "usage: augur [--json] [--verbose] [--dir <projects-dir>] <file>[:<line>]")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "  Traces a file (or line) back to the Claude session that wrote it.")
 		fmt.Fprintln(os.Stderr, "")
@@ -94,14 +96,14 @@ func Run() int {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
-		printLineResult(result, jsonFlag)
+		printLineResult(result, jsonFlag, verboseFlag)
 	} else {
 		result, err := lookupFile(absFile, claudeDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
-		printFileResult(result, jsonFlag)
+		printFileResult(result, jsonFlag, verboseFlag)
 	}
 
 	return 0
@@ -218,22 +220,22 @@ func buildRegions(blameMap map[int]*BlameInfo) []Region {
 	return regions
 }
 
-func printLineResult(r *LineResult, asJSON bool) {
+func printLineResult(r *LineResult, asJSON, verbose bool) {
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		enc.Encode(r) //nolint:errcheck
 		return
 	}
-	printLineResultText(r)
+	printLineResultText(r, verbose)
 }
 
-func printFileResult(r *FileResult, asJSON bool) {
+func printFileResult(r *FileResult, asJSON, verbose bool) {
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		enc.Encode(r) //nolint:errcheck
 		return
 	}
-	printFileResultText(r)
+	printFileResultText(r, verbose)
 }

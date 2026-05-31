@@ -61,11 +61,80 @@ func TestExtractEditsFromMessage_NoPath(t *testing.T) {
 	}
 }
 
-func TestExtractEditsFromMessage_NonEditTool(t *testing.T) {
+func TestExtractEditsFromMessage_BashNonWriteCommand(t *testing.T) {
 	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"ls"}}]}`)
 	edits := extractEditsFromMessage(raw)
 	if len(edits) != 0 {
-		t.Errorf("Bash tool should not produce edits, got %d", len(edits))
+		t.Errorf("Bash command with no file writes should produce no edits, got %d", len(edits))
+	}
+}
+
+func TestExtractEditsFromMessage_BashOutputRedirect(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"echo hello > /repo/main.go"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for output redirect, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/main.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
+	}
+	if edits[0].Tool != "Bash" {
+		t.Errorf("wrong tool: %q", edits[0].Tool)
+	}
+}
+
+func TestExtractEditsFromMessage_BashAppendRedirect(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"echo more >> /repo/main.go"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for append redirect, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/main.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
+	}
+}
+
+func TestExtractEditsFromMessage_BashHeredoc(t *testing.T) {
+	raw := json.RawMessage("{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"id\":\"b1\",\"input\":{\"command\":\"cat > /repo/main.go << 'EOF'\\npackage main\\nEOF\"}}]}")
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for heredoc redirect, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/main.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
+	}
+}
+
+func TestExtractEditsFromMessage_BashTee(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"cat /tmp/x | tee /repo/output.go"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for tee, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/output.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
+	}
+}
+
+func TestExtractEditsFromMessage_BashTeeAppend(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"echo line | tee -a /repo/log.go"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for tee -a, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/log.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
+	}
+}
+
+func TestExtractEditsFromMessage_BashSedInPlace(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Bash","id":"b1","input":{"command":"sed -i 's/foo/bar/g' /repo/main.go"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for sed -i, got %d", len(edits))
+	}
+	if edits[0].Path != "/repo/main.go" {
+		t.Errorf("wrong path: %q", edits[0].Path)
 	}
 }
 

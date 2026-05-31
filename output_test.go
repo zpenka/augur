@@ -104,7 +104,7 @@ func TestPrintLineResultText_WithMatch(t *testing.T) {
 			TotalTurns: 5,
 		},
 	}
-	out := captureStdout(t, func() { printLineResultText(r) })
+	out := captureStdout(t, func() { printLineResultText(r, false) })
 
 	for _, want := range []string{"abc12345", "Alice", "Add auth handler", "sess1234", "main", "implement auth", "2 of 5"} {
 		if !strings.Contains(out, want) {
@@ -119,7 +119,7 @@ func TestPrintLineResultText_NoMatch(t *testing.T) {
 		Line:  10,
 		Blame: &BlameInfo{CommitHash: "abc1234567890abcdef1234567890abcdef12345"},
 	}
-	out := captureStdout(t, func() { printLineResultText(r) })
+	out := captureStdout(t, func() { printLineResultText(r, false) })
 	if !strings.Contains(out, "no session match") {
 		t.Errorf("expected 'no session match' in output:\n%s", out)
 	}
@@ -127,7 +127,7 @@ func TestPrintLineResultText_NoMatch(t *testing.T) {
 
 func TestPrintLineResultText_NilBlame(t *testing.T) {
 	r := &LineResult{File: "/repo/main.go", Line: 1}
-	out := captureStdout(t, func() { printLineResultText(r) })
+	out := captureStdout(t, func() { printLineResultText(r, false) })
 	if out == "" {
 		t.Error("expected non-empty output")
 	}
@@ -148,7 +148,7 @@ func TestPrintLineResultText_NoSessionBranch(t *testing.T) {
 			TotalTurns: 1,
 		},
 	}
-	out := captureStdout(t, func() { printLineResultText(r) })
+	out := captureStdout(t, func() { printLineResultText(r, false) })
 	// Branch field is empty — branch line should be absent
 	if strings.Contains(out, "branch") {
 		t.Errorf("expected no branch line when Branch is empty:\n%s", out)
@@ -174,7 +174,7 @@ func TestPrintFileResultText_WithMatch(t *testing.T) {
 			},
 		},
 	}
-	out := captureStdout(t, func() { printFileResultText(r) })
+	out := captureStdout(t, func() { printFileResultText(r, false) })
 	if !strings.Contains(out, "fix the handler") {
 		t.Errorf("expected prompt in output:\n%s", out)
 	}
@@ -198,7 +198,7 @@ func TestPrintFileResultText_NoMatch_WithAuthor(t *testing.T) {
 			},
 		},
 	}
-	out := captureStdout(t, func() { printFileResultText(r) })
+	out := captureStdout(t, func() { printFileResultText(r, false) })
 	if !strings.Contains(out, "no match (Carol)") {
 		t.Errorf("expected 'no match (Carol)' in output:\n%s", out)
 	}
@@ -215,7 +215,7 @@ func TestPrintFileResultText_NoMatch_NoAuthor(t *testing.T) {
 			},
 		},
 	}
-	out := captureStdout(t, func() { printFileResultText(r) })
+	out := captureStdout(t, func() { printFileResultText(r, false) })
 	if !strings.Contains(out, "no match") {
 		t.Errorf("expected 'no match' in output:\n%s", out)
 	}
@@ -232,7 +232,7 @@ func TestPrintFileResultText_NilBlame(t *testing.T) {
 			{StartLine: 1, EndLine: 1},
 		},
 	}
-	out := captureStdout(t, func() { printFileResultText(r) })
+	out := captureStdout(t, func() { printFileResultText(r, false) })
 	if out == "" {
 		t.Error("expected non-empty output")
 	}
@@ -249,7 +249,7 @@ func TestPrintFileResultText_SingleLineRange(t *testing.T) {
 			},
 		},
 	}
-	out := captureStdout(t, func() { printFileResultText(r) })
+	out := captureStdout(t, func() { printFileResultText(r, false) })
 	// Single-line region should show "5" not "5-5"
 	if strings.Contains(out, "5-5") {
 		t.Errorf("single-line region should not show range:\n%s", out)
@@ -267,7 +267,7 @@ func TestPrintLineResult_JSON(t *testing.T) {
 			Summary:    "init",
 		},
 	}
-	out := captureStdout(t, func() { printLineResult(r, true) })
+	out := captureStdout(t, func() { printLineResult(r, true, false) })
 	var got LineResult
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, out)
@@ -283,7 +283,7 @@ func TestPrintLineResult_Text(t *testing.T) {
 		Line:  1,
 		Blame: &BlameInfo{CommitHash: "abc1234567890abcdef1234567890abcdef12345"},
 	}
-	out := captureStdout(t, func() { printLineResult(r, false) })
+	out := captureStdout(t, func() { printLineResult(r, false, false) })
 	if out == "" {
 		t.Error("expected non-empty text output")
 	}
@@ -296,7 +296,7 @@ func TestPrintFileResult_JSON(t *testing.T) {
 			{StartLine: 1, EndLine: 3, Blame: &BlameInfo{CommitHash: "abc1234567890abcdef1234567890abcdef12345"}},
 		},
 	}
-	out := captureStdout(t, func() { printFileResult(r, true) })
+	out := captureStdout(t, func() { printFileResult(r, true, false) })
 	var got FileResult
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, out)
@@ -313,8 +313,64 @@ func TestPrintFileResult_Text(t *testing.T) {
 			{StartLine: 1, EndLine: 3, Blame: &BlameInfo{CommitHash: "abc1234567890abcdef1234567890abcdef12345"}},
 		},
 	}
-	out := captureStdout(t, func() { printFileResult(r, false) })
+	out := captureStdout(t, func() { printFileResult(r, false, false) })
 	if out == "" {
 		t.Error("expected non-empty text output")
+	}
+}
+
+func TestPrintLineResultText_VerboseShowsFullPrompt(t *testing.T) {
+	longPrompt := strings.Repeat("a", 200)
+	r := &LineResult{
+		File:  "/repo/main.go",
+		Line:  1,
+		Blame: &BlameInfo{CommitHash: "abc1234567890abcdef1234567890abcdef12345"},
+		Match: &MatchResult{
+			Session:    SessionMeta{ID: "s1", Timestamp: time.Now()},
+			Prompt:     longPrompt,
+			TurnIndex:  1,
+			TotalTurns: 1,
+		},
+	}
+
+	outShort := captureStdout(t, func() { printLineResultText(r, false) })
+	if strings.Contains(outShort, longPrompt) {
+		t.Error("non-verbose should truncate long prompt")
+	}
+
+	outFull := captureStdout(t, func() { printLineResultText(r, true) })
+	if !strings.Contains(outFull, longPrompt) {
+		t.Error("verbose should show full prompt without truncation")
+	}
+}
+
+func TestPrintFileResultText_VerboseShowsFullPrompt(t *testing.T) {
+	longPrompt := strings.Repeat("b", 200)
+	r := &FileResult{
+		File: "/repo/main.go",
+		Regions: []Region{
+			{
+				StartLine: 1,
+				EndLine:   10,
+				Blame: &BlameInfo{
+					CommitHash: "abc1234567890abcdef1234567890abcdef12345",
+					AuthorTime: time.Now().Add(-time.Hour),
+				},
+				Match: &MatchResult{
+					Session: SessionMeta{ID: "s1", Timestamp: time.Now()},
+					Prompt:  longPrompt,
+				},
+			},
+		},
+	}
+
+	outShort := captureStdout(t, func() { printFileResultText(r, false) })
+	if strings.Contains(outShort, longPrompt) {
+		t.Error("non-verbose should truncate long prompt in file mode")
+	}
+
+	outFull := captureStdout(t, func() { printFileResultText(r, true) })
+	if !strings.Contains(outFull, longPrompt) {
+		t.Error("verbose should show full prompt in file mode")
 	}
 }

@@ -13,7 +13,7 @@ go install github.com/zpenka/augur/cmd/augur@latest
 ## Usage
 
 ```
-augur [--json] [--dir <projects-dir>] <file>[:<line>]
+augur [--json] [--verbose] [--dir <projects-dir>] <file>[:<line>]
 ```
 
 ```bash
@@ -25,6 +25,9 @@ augur src/auth.go
 
 # JSON output (for piping / tooling)
 augur --json src/auth.go:42
+
+# Show the full prompt without truncation
+augur --verbose src/auth.go:42
 
 # Use a custom Claude projects directory
 augur --dir /path/to/projects src/auth.go
@@ -77,7 +80,7 @@ src/auth.go — 3 region(s), 2 AI-attributed
 1. Runs `git blame` on the target file/line to get the commit hash and timestamp.
 2. Scans `~/.claude/projects/` for sessions whose working directory is within the same git repo.
 3. Filters to sessions that started within 7 days before the commit (with a 1-hour clock-skew buffer).
-4. Parses each candidate session's JSONL transcript, looking for `Edit` or `Write` tool calls on the target file.
+4. Parses each candidate session's JSONL transcript, looking for `Edit`, `Write`, and `Bash` tool calls on the target file.
 5. Returns the user prompt that preceded the matching edit, plus session metadata.
 
 ## Configuration
@@ -86,6 +89,7 @@ src/auth.go — 3 region(s), 2 AI-attributed
 |------|---------|---------|
 | `--dir` | `AUGUR_PROJECTS_DIR` | `~/.claude/projects` |
 | `--json` | — | text output |
+| `--verbose` | — | truncated prompts |
 
 ## Companion tool
 

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -182,6 +183,36 @@ func extractPromptFromMessage(raw json.RawMessage) string {
 	return strings.Join(parts, " ")
 }
 
+var (
+	reBashRedirect   = regexp.MustCompile(`>{1,2}\s*(/\S+)`)
+	reBashTee        = regexp.MustCompile(`\btee\s+(?:-a\s+)?(/\S+)`)
+	reBashSedInPlace = regexp.MustCompile(`\bsed\b[^|&;]*?-i\S*[^|&;]*?\s(/\S+)`)
+)
+
+// extractBashPaths returns absolute file paths that a bash command writes to.
+// Recognises output redirects (> / >>), tee, and sed -i.
+func extractBashPaths(command string) []string {
+	seen := make(map[string]bool)
+	var paths []string
+	add := func(p string) {
+		p = strings.TrimRight(p, ";|&)")
+		if p != "" && !seen[p] && strings.HasPrefix(p, "/") {
+			seen[p] = true
+			paths = append(paths, p)
+		}
+	}
+	for _, m := range reBashRedirect.FindAllStringSubmatch(command, -1) {
+		add(m[1])
+	}
+	for _, m := range reBashTee.FindAllStringSubmatch(command, -1) {
+		add(m[1])
+	}
+	for _, m := range reBashSedInPlace.FindAllStringSubmatch(command, -1) {
+		add(m[1])
+	}
+	return paths
+}
+
 // extractEditsFromMessage returns Edit/Write tool calls from an assistant message.
 func extractEditsFromMessage(raw json.RawMessage) []EditRef {
 	if len(raw) == 0 {
@@ -199,7 +230,8 @@ func extractEditsFromMessage(raw json.RawMessage) []EditRef {
 		Type  string `json:"type"`
 		Name  string `json:"name"`
 		Input struct {
-			Path string `json:"path"`
+			Path    string `json:"path"`
+			Command string `json:"command"`
 		} `json:"input"`
 	}
 	if err := json.Unmarshal(msg.Content, &blocks); err != nil {
@@ -208,8 +240,18 @@ func extractEditsFromMessage(raw json.RawMessage) []EditRef {
 
 	var edits []EditRef
 	for _, b := range blocks {
-		if b.Type == "tool_use" && (b.Name == "Edit" || b.Name == "Write") && b.Input.Path != "" {
-			edits = append(edits, EditRef{Path: b.Input.Path, Tool: b.Name})
+		if b.Type != "tool_use" {
+			continue
+		}
+		switch b.Name {
+		case "Edit", "Write":
+			if b.Input.Path != "" {
+				edits = append(edits, EditRef{Path: b.Input.Path, Tool: b.Name})
+			}
+		case "Bash":
+			for _, p := range extractBashPaths(b.Input.Command) {
+				edits = append(edits, EditRef{Path: p, Tool: "Bash"})
+			}
 		}
 	}
 	return edits

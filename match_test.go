@@ -177,6 +177,101 @@ func TestFindMatch_ParseTurnsError(t *testing.T) {
 	}
 }
 
+func TestFindMatch_RelativeEditPath(t *testing.T) {
+	const sessionContent = `{"type":"user","sessionId":"abc","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"fix it"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"path":"main.go","old_string":"x","new_string":"y"}}]}}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.jsonl")
+	if err := os.WriteFile(path, []byte(sessionContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	commitTime := time.Date(2026, 5, 28, 14, 0, 0, 0, time.UTC)
+	sessions := []SessionMeta{{
+		ID:        "abc",
+		Path:      path,
+		CWD:       "/repo",
+		Timestamp: time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC),
+	}}
+
+	m, err := findMatch(sessions, "/repo", "/repo/main.go", commitTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m == nil {
+		t.Fatal("expected match: relative edit path 'main.go' + CWD '/repo' should match '/repo/main.go'")
+	}
+	if m.Prompt != "fix it" {
+		t.Errorf("wrong prompt: %q", m.Prompt)
+	}
+}
+
+func TestFindMatch_RelativeEditPathSubdir(t *testing.T) {
+	const sessionContent = `{"type":"user","sessionId":"abc","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"fix auth"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"path":"src/auth.go","old_string":"x","new_string":"y"}}]}}
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.jsonl")
+	if err := os.WriteFile(path, []byte(sessionContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	commitTime := time.Date(2026, 5, 28, 14, 0, 0, 0, time.UTC)
+	sessions := []SessionMeta{{
+		ID:        "abc",
+		Path:      path,
+		CWD:       "/repo",
+		Timestamp: time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC),
+	}}
+
+	m, err := findMatch(sessions, "/repo", "/repo/src/auth.go", commitTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m == nil {
+		t.Fatal("expected match: relative edit 'src/auth.go' + CWD '/repo' should match '/repo/src/auth.go'")
+	}
+}
+
+func TestSameFile_Symlink(t *testing.T) {
+	real := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "symlink")
+	if err := os.Symlink(real, linkDir); err != nil {
+		t.Skip("cannot create symlink:", err)
+	}
+
+	realFile := filepath.Join(real, "test.go")
+	if err := os.WriteFile(realFile, []byte(""), 0600); err != nil {
+		t.Fatal(err)
+	}
+	linkedFile := filepath.Join(linkDir, "test.go")
+
+	if !sameFile(realFile, linkedFile) {
+		t.Errorf("symlinked paths should be considered equal: %q vs %q", realFile, linkedFile)
+	}
+}
+
+func TestIsRepoSession_Symlink(t *testing.T) {
+	real := t.TempDir()
+	linkDir := filepath.Join(t.TempDir(), "symlink")
+	if err := os.Symlink(real, linkDir); err != nil {
+		t.Skip("cannot create symlink:", err)
+	}
+
+	subdir := filepath.Join(real, "src")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if !isRepoSession(linkDir, real) {
+		t.Errorf("symlinked CWD should match real root: %q vs %q", linkDir, real)
+	}
+	if !isRepoSession(subdir, linkDir) {
+		t.Errorf("real subdir should match symlinked root: %q vs %q", subdir, linkDir)
+	}
+}
+
 func TestFindMatch_WrongFile(t *testing.T) {
 	const sessionContent = `{"type":"user","sessionId":"abc","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"fix the handler"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"path":"/repo/other.go","old_string":"x","new_string":"y"}}]}}

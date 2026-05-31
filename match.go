@@ -57,7 +57,11 @@ func findMatch(sessions []SessionMeta, gitRoot, absFile string, commitTime time.
 		pairs := buildPromptEdits(turns)
 		for i, pe := range pairs {
 			for _, edit := range pe.Edits {
-				if sameFile(edit.Path, absFile) {
+				editPath := edit.Path
+				if !filepath.IsAbs(editPath) && s.CWD != "" {
+					editPath = filepath.Join(s.CWD, editPath)
+				}
+				if sameFile(editPath, absFile) {
 					return &MatchResult{
 						Session:    s,
 						Prompt:     pe.Prompt,
@@ -101,13 +105,21 @@ func isRepoSession(sessionCWD, gitRoot string) bool {
 	if sessionCWD == "" || gitRoot == "" {
 		return false
 	}
-	sessionCWD = filepath.Clean(sessionCWD)
-	gitRoot = filepath.Clean(gitRoot)
+	sessionCWD = resolveSymlink(filepath.Clean(sessionCWD))
+	gitRoot = resolveSymlink(filepath.Clean(gitRoot))
 	return sessionCWD == gitRoot ||
 		strings.HasPrefix(sessionCWD, gitRoot+string(os.PathSeparator))
 }
 
-// sameFile returns true if two paths refer to the same file after cleaning.
+// sameFile returns true if two paths refer to the same file after cleaning and symlink resolution.
 func sameFile(a, b string) bool {
-	return filepath.Clean(a) == filepath.Clean(b)
+	return resolveSymlink(filepath.Clean(a)) == resolveSymlink(filepath.Clean(b))
+}
+
+// resolveSymlink resolves symlinks in path; returns the cleaned path if resolution fails.
+func resolveSymlink(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
