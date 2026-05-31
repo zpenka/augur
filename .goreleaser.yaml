@@ -44,7 +44,7 @@ changelog:
       - Merge pull request
       - Merge branch
 
-brews:
+homebrew_casks:
   - name: augur
     repository:
       owner: zpenka
@@ -52,6 +52,12 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/zpenka/augur
     description: "git blame for AI — traces code back to the Claude session that wrote it"
-    license: MIT
-    install: bin.install "augur"
-    test: system "#{bin}/augur", "--version"
+    binaries: [augur]
+    url:
+      verified: github.com/zpenka/augur
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/augur"]
+          end
