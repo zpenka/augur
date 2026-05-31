@@ -1,0 +1,57 @@
+version: 2
+
+project_name: augur
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: augur
+    main: ./cmd/augur
+    binary: augur
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/zpenka/augur.Version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+brews:
+  - name: augur
+    repository:
+      owner: zpenka
+      name: homebrew-augur
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/zpenka/augur
+    description: "git blame for AI — traces code back to the Claude session that wrote it"
+    license: MIT
+    install: bin.install "augur"
+    test: system "#{bin}/augur", "--version"
