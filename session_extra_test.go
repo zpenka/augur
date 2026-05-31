@@ -38,6 +38,21 @@ func TestExtractPromptFromMessage_MixedBlocks(t *testing.T) {
 	}
 }
 
+func TestExtractEditsFromMessage_EditFilePath(t *testing.T) {
+	// Claude Code emits "file_path" not "path" for Edit/Write tool inputs.
+	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"file_path":"/proj/auth.go","old_string":"x","new_string":"y"}}]}`)
+	edits := extractEditsFromMessage(raw)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+	if edits[0].Path != "/proj/auth.go" {
+		t.Errorf("wrong path: %s", edits[0].Path)
+	}
+	if edits[0].Tool != "Edit" {
+		t.Errorf("wrong tool: %s", edits[0].Tool)
+	}
+}
+
 func TestExtractEditsFromMessage_Write(t *testing.T) {
 	raw := json.RawMessage(`{"content":[{"type":"tool_use","name":"Write","id":"w1","input":{"path":"/proj/new.go","content":"package main"}}]}`)
 	edits := extractEditsFromMessage(raw)

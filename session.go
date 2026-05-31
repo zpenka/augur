@@ -230,8 +230,9 @@ func extractEditsFromMessage(raw json.RawMessage) []EditRef {
 		Type  string `json:"type"`
 		Name  string `json:"name"`
 		Input struct {
-			Path    string `json:"path"`
-			Command string `json:"command"`
+			Path     string `json:"path"`
+			FilePath string `json:"file_path"`
+			Command  string `json:"command"`
 		} `json:"input"`
 	}
 	if err := json.Unmarshal(msg.Content, &blocks); err != nil {
@@ -245,8 +246,12 @@ func extractEditsFromMessage(raw json.RawMessage) []EditRef {
 		}
 		switch b.Name {
 		case "Edit", "Write":
-			if b.Input.Path != "" {
-				edits = append(edits, EditRef{Path: b.Input.Path, Tool: b.Name})
+			p := b.Input.FilePath
+			if p == "" {
+				p = b.Input.Path
+			}
+			if p != "" {
+				edits = append(edits, EditRef{Path: p, Tool: b.Name})
 			}
 		case "Bash":
 			for _, p := range extractBashPaths(b.Input.Command) {
