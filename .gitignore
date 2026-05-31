@@ -1,0 +1,13 @@
+# Build output
+augur
+/dist/
+
+# Test artifacts
+coverage.out
+*.test
+
+# Claude Code
+.claude/
+
+# macOS
+.DS_Store

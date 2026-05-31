@@ -7,6 +7,110 @@ import (
 	"time"
 )
 
+// sampleSessionLine returns a minimal valid user-event JSON line with the given session content.
+func writeTempProjectDir(t *testing.T, sessions map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "project")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range sessions {
+		if err := os.WriteFile(filepath.Join(projDir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func TestScanSessionMeta_EmptyDir(t *testing.T) {
+	sessions, err := scanSessionMeta(t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Errorf("expected 0 sessions, got %d", len(sessions))
+	}
+}
+
+func TestScanSessionMeta_NonExistentDir(t *testing.T) {
+	// WalkDir swallows the root error, so a missing dir returns empty with no error.
+	sessions, err := scanSessionMeta("/nonexistent/path/that/does/not/exist")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Errorf("expected 0 sessions, got %d", len(sessions))
+	}
+}
+
+func TestScanSessionMeta_ValidSessions(t *testing.T) {
+	const s1 = `{"type":"user","sessionId":"aaa","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"hello"}]}}`
+	const s2 = `{"type":"user","sessionId":"bbb","timestamp":"2026-05-29T10:00:00.000Z","cwd":"/repo2","gitBranch":"feat","message":{"role":"user","content":[{"type":"text","text":"world"}]}}`
+
+	dir := writeTempProjectDir(t, map[string]string{
+		"session1.jsonl": s1,
+		"session2.jsonl": s2,
+		"notes.txt":      "ignored",
+	})
+
+	sessions, err := scanSessionMeta(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Errorf("expected 2 sessions, got %d", len(sessions))
+	}
+}
+
+func TestScanSessionMeta_FiltersSubagents(t *testing.T) {
+	const content = `{"type":"user","sessionId":"sub","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}`
+
+	dir := t.TempDir()
+	subDir := filepath.Join(dir, "project", "subagents")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "sub.jsonl"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err := scanSessionMeta(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Errorf("expected 0 sessions (subagents filtered), got %d", len(sessions))
+	}
+}
+
+func TestScanSessionMeta_SkipsUnreadableFile(t *testing.T) {
+	const s1 = `{"type":"user","sessionId":"aaa","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"hello"}]}}`
+
+	dir := writeTempProjectDir(t, map[string]string{
+		"good.jsonl": s1,
+		"bad.jsonl":  "not json at all",
+	})
+
+	sessions, err := scanSessionMeta(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// bad.jsonl has no user event, so only the good one is returned
+	if len(sessions) != 1 {
+		t.Errorf("expected 1 session, got %d", len(sessions))
+	}
+}
+
+func TestReadSessionMeta_BadTimestamp(t *testing.T) {
+	const content = `{"type":"user","sessionId":"abc","timestamp":"not-a-timestamp","cwd":"/repo","gitBranch":"main","message":{}}`
+	path := writeTempSession(t, content)
+	_, err := readSessionMeta(path)
+	if err == nil {
+		t.Error("expected error for bad timestamp")
+	}
+}
+
 const sampleSession = `{"type":"user","sessionId":"c95ad6fe-0000-0000-0000-000000000000","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/home/user/myproject","gitBranch":"main","slug":"test-session","message":{"role":"user","content":[{"type":"text","text":"add error handling to auth"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","id":"t1","input":{"path":"/home/user/myproject/src/auth.go"}}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file contents"}]}}

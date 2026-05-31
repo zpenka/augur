@@ -64,11 +64,11 @@ func printFileResultText(r *FileResult) {
 			prompt := truncate(reg.Match.Prompt, 60)
 			fmt.Printf("  lines %-8s  %s  %-12s  %q\n", lineRange, commitShort, age, prompt)
 		} else {
-			author := ""
 			if reg.Blame != nil && reg.Blame.Author != "" {
-				author = reg.Blame.Author + ", "
+				fmt.Printf("  lines %-8s  %s  %-12s  no match (%s)\n", lineRange, commitShort, age, reg.Blame.Author)
+			} else {
+				fmt.Printf("  lines %-8s  %s  %-12s  no match\n", lineRange, commitShort, age)
 			}
-			fmt.Printf("  lines %-8s  %s  %-12s  no match (%s%s)\n", lineRange, commitShort, age, author, age)
 		}
 	}
 

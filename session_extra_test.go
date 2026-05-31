@@ -74,3 +74,27 @@ func TestExtractEditsFromMessage_Empty(t *testing.T) {
 		t.Errorf("nil should produce no edits")
 	}
 }
+
+func TestExtractEditsFromMessage_BadContentJSON(t *testing.T) {
+	// content field is not an array — should return nil gracefully
+	raw := json.RawMessage(`{"content":"not-an-array"}`)
+	if edits := extractEditsFromMessage(raw); len(edits) != 0 {
+		t.Errorf("bad content JSON should produce no edits, got %d", len(edits))
+	}
+}
+
+func TestExtractPromptFromMessage_NullContent(t *testing.T) {
+	raw := json.RawMessage(`{"content":null}`)
+	got := extractPromptFromMessage(raw)
+	if got != "" {
+		t.Errorf("null content should return empty, got %q", got)
+	}
+}
+
+func TestExtractPromptFromMessage_BadOuterJSON(t *testing.T) {
+	// Completely invalid JSON — should return ""
+	got := extractPromptFromMessage(json.RawMessage(`{bad json`))
+	if got != "" {
+		t.Errorf("bad JSON should return empty, got %q", got)
+	}
+}

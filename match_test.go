@@ -157,6 +157,26 @@ func TestFindMatch_HitsFile(t *testing.T) {
 	}
 }
 
+func TestFindMatch_ParseTurnsError(t *testing.T) {
+	// Session path points to a nonexistent file — parseTurns will error, session is skipped.
+	commitTime := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
+	sessions := []SessionMeta{
+		{
+			ID:        "bad",
+			Path:      "/nonexistent/session.jsonl",
+			CWD:       "/repo",
+			Timestamp: commitTime.Add(-time.Hour),
+		},
+	}
+	m, err := findMatch(sessions, "/repo", "/repo/main.go", commitTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m != nil {
+		t.Fatal("expected nil when session file is unreadable")
+	}
+}
+
 func TestFindMatch_WrongFile(t *testing.T) {
 	const sessionContent = `{"type":"user","sessionId":"abc","timestamp":"2026-05-28T10:00:00.000Z","cwd":"/repo","gitBranch":"main","message":{"role":"user","content":[{"type":"text","text":"fix the handler"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"path":"/repo/other.go","old_string":"x","new_string":"y"}}]}}
